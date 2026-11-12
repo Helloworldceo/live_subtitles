@@ -1,7 +1,8 @@
 faster-whisper>=1.0.3
 sounddevice>=0.4.6
 numpy>=1.24
-PySide6>=6.6
+# Only QtCore/QtGui/QtWidgets are used: the Essentials wheel is ~340 MB smaller than full PySide6
+PySide6-Essentials>=6.6
 # macOS-only helpers: overlay above full-screen apps + global hotkeys
 pyobjc-framework-Cocoa>=10.0; sys_platform == "darwin"
 pyobjc-framework-Quartz>=10.0; sys_platform == "darwin"

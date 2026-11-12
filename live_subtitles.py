@@ -22,6 +22,7 @@ Quick start (after following SETUP_GUIDE.md):
     python live_subtitles.py --list-devices      # find BlackHole
     python live_subtitles.py --test-audio        # check that audio is actually arriving
     python live_subtitles.py --model base        # run the overlay
+    python live_subtitles.py --translate --language zh --model small   # Chinese speech -> English
 
 Keyboard shortcuts
 ------------------

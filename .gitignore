@@ -7,3 +7,4 @@ obs_subtitles.txt
 run.log
 *.bak*
 .DS_Store
+*.py.*
