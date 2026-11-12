@@ -1,5 +1,7 @@
 # Live Subtitles for macOS
 
+**English** · [简体中文](README.zh-CN.md) · [Español](README.es.md) · [Français](README.fr.md) · [日本語](README.ja.md) · [한국어](README.ko.md)
+
 Real-time subtitles for **anything playing on your Mac**: YouTube, movies, Zoom, games. They appear in a transparent bar that floats on top of every app, including full-screen Chrome.
 
 - **100% offline.** Speech recognition runs locally with [faster-whisper](https://github.com/SYSTRAN/faster-whisper). No cloud APIs and no account.
@@ -116,6 +118,22 @@ Quit and reopen Terminal afterwards.
 | Settings from a file | `./run.sh --config config.example.json` |
 | Every option | `./run.sh --help` |
 
+### Other spoken languages
+
+Whisper understands about 95 languages. Pass the language code with `--language`, and add `--translate` if you want English subtitles instead of subtitles in the original language. Translation needs the multilingual model, so install with `./install.sh --translate` or let the first run download it.
+
+| Language | Code | Translate to English | Subtitles in that language |
+|---|---|---|---|
+| Chinese | `zh` | `./run.sh --translate --language zh --model small` | `./run.sh --language zh --model small` |
+| Spanish | `es` | `./run.sh --translate --language es --model small` | `./run.sh --language es --model small` |
+| French | `fr` | `./run.sh --translate --language fr --model small` | `./run.sh --language fr --model small` |
+| Japanese | `ja` | `./run.sh --translate --language ja --model small` | `./run.sh --language ja --model small` |
+| Korean | `ko` | `./run.sh --translate --language ko --model small` | `./run.sh --language ko --model small` |
+| German | `de` | `./run.sh --translate --language de --model small` | `./run.sh --language de --model small` |
+| Unknown or mixed | `auto` | `./run.sh --translate --model small` | `./run.sh --language auto --model small` |
+
+Other codes follow the same pattern, for example `ru`, `pt`, `it`, `ar`, `hi`, `vi`, `th` or `id`. Setting the language explicitly is about twice as fast as `auto`. For better accuracy use `--model medium`, which is slower.
+
 ### Keyboard shortcuts
 
 | Keys | Works | Action |
@@ -189,3 +207,4 @@ The full guide, with manual steps, mirrors and more fixes, is in **[docs/SETUP_G
 | `requirements.txt` | Python packages |
 | `config.example.json` | example settings file |
 | `docs/SETUP_GUIDE.md` | detailed manual setup and troubleshooting |
+| `README.*.md` | install guides in Chinese, Spanish, French, Japanese, Korean |
