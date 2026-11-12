@@ -170,6 +170,7 @@ Drag the bar to move it. It also follows your mouse to another display.
 | `--bg-opacity` | `0.55` | 0 = invisible box, 1 = solid |
 | `--max-lines` | `2` | lines kept on screen |
 | `--partial-interval` | `0.6` | seconds between live preview updates (0 = off) |
+| `--min-speech` | `0.3` | seconds of detected speech needed before anything is shown (raise it if noise still produces text) |
 | `--max-chunk` | `4.0` | longest chunk before a forced cut |
 | `--device` | `BlackHole` | capture device name or index |
 

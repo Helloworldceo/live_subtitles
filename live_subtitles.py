@@ -129,6 +129,7 @@ class Config:
     max_chunk: float = 4.0  # seconds: force a cut even if nobody pauses (live preview hides the wait)
     pause_len: float = 0.35  # seconds of quiet at the end of the buffer = "pause"
     silence_rms: float = 0.004  # RMS below this is treated as silence
+    min_speech: float = 0.3  # seconds of real speech (Silero VAD) a chunk needs to be shown
     partial_interval: float = 0.6  # seconds between live "as you speak" updates (0 = off)
     # Overlay look
     font_size: int = 28
@@ -186,6 +187,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
     g.add_argument("--max-chunk", type=float, default=d.max_chunk)
     g.add_argument("--pause-len", type=float, default=d.pause_len)
     g.add_argument("--silence-rms", type=float, default=d.silence_rms)
+    g.add_argument(
+        "--min-speech",
+        type=float,
+        default=d.min_speech,
+        help="ignore chunks with less than this many seconds of detected speech (noise, music)",
+    )
     g.add_argument(
         "--partial-interval",
         type=float,
@@ -426,7 +433,19 @@ class Transcriber(threading.Thread):
             lang = "auto"  # translating: detect what is being spoken
         return None if lang == "auto" else lang
 
+    def speech_seconds(self, audio: np.ndarray) -> float:
+        """How much real speech Silero VAD finds in `audio` (noise, music and hum score ~0)."""
+        from faster_whisper.vad import VadOptions, get_speech_timestamps
+
+        stamps = get_speech_timestamps(audio, VadOptions(threshold=0.5, min_silence_duration_ms=300))
+        return sum(s["end"] - s["start"] for s in stamps) / WHISPER_SAMPLE_RATE
+
     def transcribe(self, audio: np.ndarray, chunk_rms: float, final: bool = True) -> str:
+        # Gate: no real speech in this chunk -> no subtitle. This is what stops room noise,
+        # music or a quiet microphone from producing made-up lines.
+        speech = self.speech_seconds(audio)
+        if speech < self.cfg.min_speech:
+            return ""
         segments, _info = self.model.transcribe(
             audio,
             language=self.spoken_language(),  # "en" by default; None = auto-detect
@@ -441,8 +460,8 @@ class Transcriber(threading.Thread):
         )
         parts = []
         for seg in segments:
-            # Whisper's own "this was not speech" signal.
-            if seg.no_speech_prob > 0.6 and seg.avg_logprob < -1.0:
+            # Whisper's own "not speech" / "not confident" / "repeating itself" signals.
+            if seg.no_speech_prob > 0.5 or seg.avg_logprob < -1.0 or seg.compression_ratio > 2.4:
                 continue
             t = clean_text(seg.text)
             if t:
@@ -453,7 +472,9 @@ class Transcriber(threading.Thread):
         if not re.search(r"\w", text):
             return ""
         # Ignore well-known hallucinations when the chunk was fairly quiet.
-        if text.lower().strip(" .!") in {h.strip(" .!") for h in HALLUCINATIONS} and chunk_rms < self.cfg.silence_rms * 4:
+        if text.lower().strip(" .!") in {h.strip(" .!") for h in HALLUCINATIONS} and (
+            chunk_rms < self.cfg.silence_rms * 4 or speech < 1.0
+        ):
             return ""
         if not final:
             return text  # live preview: no de-duplication, it will be replaced anyway
@@ -598,7 +619,10 @@ class Overlay(QWidget):
         super().__init__()
         self.cfg = cfg
         self.outputs = outputs
-        self.lines: deque[str] = deque(maxlen=max(1, cfg.max_lines))
+        # (text, time shown). Each line disappears clear_after seconds after it appeared,
+        # so old lines never pile up on screen.
+        self.lines: deque[tuple[str, float]] = deque(maxlen=max(1, cfg.max_lines))
+        self.partial_time = 0.0
         self.status_text = ""
         self.partial_text = ""
         self._drag_offset: QPoint | None = None
@@ -643,10 +667,10 @@ class Overlay(QWidget):
         self.keep_timer.timeout.connect(self._keep_visible)
         self.keep_timer.start(700)
 
-        # Clear the subtitle after a few seconds of no new speech.
-        self.clear_timer = QTimer(self)
-        self.clear_timer.setSingleShot(True)
-        self.clear_timer.timeout.connect(self.clear_text)
+        # Remove expired lines a few times per second.
+        self.expire_timer = QTimer(self)
+        self.expire_timer.timeout.connect(self._expire_lines)
+        self.expire_timer.start(250)
 
         # Local shortcuts (overlay focused). Qt maps "Ctrl" to the Cmd key on macOS.
         for seq in ("Esc", "Ctrl+Q"):
@@ -655,16 +679,32 @@ class Overlay(QWidget):
     # -- text handling ---------------------------------------------------
     def show_partial(self, text: str) -> None:
         """Show (or clear) the sentence that is still being spoken."""
+        if text == self.partial_text:
+            return
         self.partial_text = text
+        self.partial_time = time.time()
         if text and self.status_text == LISTENING:
             self.status_text = ""
         self._render()
         self.outputs.write_obs("\n".join(self._visible_lines()))
-        if text and self.cfg.clear_after > 0:
-            self.clear_timer.start(int(self.cfg.clear_after * 1000))
+
+    def _expire_lines(self) -> None:
+        if self.cfg.clear_after <= 0:
+            return
+        cutoff = time.time() - self.cfg.clear_after
+        changed = False
+        while self.lines and self.lines[0][1] < cutoff:
+            self.lines.popleft()
+            changed = True
+        if self.partial_text and self.partial_time < cutoff:
+            self.partial_text = ""
+            changed = True
+        if changed:
+            self._render()
+            self.outputs.write_obs("\n".join(self._visible_lines()))
 
     def _visible_lines(self) -> list[str]:
-        lines = list(self.lines)
+        lines = [t for t, _ in self.lines]
         if self.partial_text:
             lines.append(self.partial_text)
         return lines[-max(1, self.cfg.max_lines):]
@@ -673,12 +713,10 @@ class Overlay(QWidget):
         self.partial_text = ""
         if self.status_text == LISTENING:
             self.status_text = ""
-        self.lines.append(text)
+        self.lines.append((text, time.time()))
         self._render()
         self.outputs.add_line(text)
         self.outputs.write_obs("\n".join(self._visible_lines()))
-        if self.cfg.clear_after > 0:
-            self.clear_timer.start(int(self.cfg.clear_after * 1000))
 
     def clear_text(self) -> None:
         self.lines.clear()
@@ -867,6 +905,29 @@ class GlobalHotkeys:
 # ----------------------------------------------------------------------------
 # Main
 # ----------------------------------------------------------------------------
+_instance_lock = None
+
+
+def acquire_single_instance_lock() -> bool:
+    """Only one overlay at a time, so windows can't stack on top of each other."""
+    global _instance_lock
+    try:
+        import fcntl
+    except ImportError:  # not on macOS/Linux
+        return True
+    import tempfile
+
+    path = Path(tempfile.gettempdir()) / "live_subtitles.lock"
+    _instance_lock = open(path, "w")
+    try:
+        fcntl.flock(_instance_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        return False
+    _instance_lock.write(str(os.getpid()))
+    _instance_lock.flush()
+    return True
+
+
 def main(argv: list[str] | None = None) -> int:
     cfg, args = load_config(argv)
 
@@ -876,6 +937,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.test_audio:
         run_audio_test(cfg.device)
         return 0
+
+    if not acquire_single_instance_lock():
+        print(
+            "Live Subtitles is already running. Quit it first (Ctrl+Option+Q, or\n"
+            "`pkill -f live_subtitles.py`), then start it again.",
+            file=sys.stderr,
+        )
+        return 1
 
     try:
         audio = AudioCapture(cfg.device)

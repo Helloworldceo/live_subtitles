@@ -211,7 +211,7 @@ python live_subtitles.py --help                                   # every option
 | `--bg-opacity` | `0.55` | 0 = invisible box, 1 = solid |
 | `--width` | `0.70` | overlay width as a fraction of the screen |
 | `--max-lines` | `2` | recent lines kept on screen |
-| `--clear-after` | `5` | seconds of quiet before the subtitle disappears |
+| `--clear-after` | `5` | each line disappears this many seconds after it appeared |
 | `--min-chunk` / `--max-chunk` | `1.0` / `4.0` | chunk length in seconds; lower `--max-chunk` = lower latency but more broken sentences |
 | `--partial-interval` | `0.6` | show words while the sentence is still being spoken, every N seconds (0 = off) |
 | `--silence-rms` | `0.004` | loudness below which audio counts as silence |
