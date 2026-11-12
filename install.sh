@@ -5,6 +5,8 @@
 #   ./install.sh --china        # use Tsinghua (Homebrew, PyPI) + hf-mirror.com (models)
 #   ./install.sh --translate    # also download the multilingual model for Chinese -> English
 #   ./install.sh --no-blackhole # skip the BlackHole driver (already installed)
+#   ./install.sh --model medium # also download another model (repeatable): tiny, base, small,
+#                               # medium, large-v3 (multilingual) or tiny.en/base.en/small.en ...
 #
 # What it does:
 #   1. installs Homebrew if missing
@@ -17,14 +19,19 @@ set -euo pipefail
 CHINA=0
 TRANSLATE=0
 BLACKHOLE=1
-for arg in "$@"; do
-  case "$arg" in
+EXTRA_MODELS=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
     --china) CHINA=1 ;;
     --translate) TRANSLATE=1 ;;
     --no-blackhole) BLACKHOLE=0 ;;
-    -h|--help) sed -n '2,15p' "$0"; exit 0 ;;
-    *) echo "Unknown option: $arg (see --help)"; exit 1 ;;
+    --model)
+      [[ $# -ge 2 ]] || { echo "--model needs a name, e.g. --model medium"; exit 1; }
+      EXTRA_MODELS+=("$2"); shift ;;
+    -h|--help) sed -n '2,17p' "$0"; exit 0 ;;
+    *) echo "Unknown option: $1 (see --help)"; exit 1 ;;
   esac
+  shift
 done
 
 cd "$(dirname "$0")"
@@ -100,6 +107,7 @@ fi
 step "4/5 Whisper model(s) (one-time download, then fully offline)"
 MODELS=("base.en")
 [[ $TRANSLATE -eq 1 ]] && MODELS+=("small")
+MODELS+=(${EXTRA_MODELS[@]+"${EXTRA_MODELS[@]}"})
 for m in "${MODELS[@]}"; do
   echo "Downloading $m ..."
   .venv/bin/python -c "from faster_whisper import WhisperModel; WhisperModel('$m', device='cpu', compute_type='int8'); print('  ok')" \

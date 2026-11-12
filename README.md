@@ -113,6 +113,7 @@ Quit and reopen Terminal afterwards.
 | Fastest (older Macs) | `./run.sh --model tiny` |
 | Chinese video → English subtitles | `./run.sh --translate --language zh --model small --cpu-threads 8` |
 | Any language → English (auto-detect) | `./run.sh --translate --model small` |
+| Japanese, Korean, Spanish … → English | `./run.sh --translate --language ja --model small` (see [Other languages](#other-languages)) |
 | Chinese subtitles (no translation) | `./run.sh --language zh --model small` |
 | Big yellow text, see-through box | `./run.sh --font-size 34 --text-color yellow --bg-opacity 0.3` |
 | Settings from a file | `./run.sh --config config.example.json` |
@@ -120,19 +121,21 @@ Quit and reopen Terminal afterwards.
 
 ### Other spoken languages
 
-Whisper understands about 95 languages. Pass the language code with `--language`, and add `--translate` if you want English subtitles instead of subtitles in the original language. Translation needs the multilingual model, so install with `./install.sh --translate` or let the first run download it.
+Whisper understands about 99 languages. Pass the language code with `--language`, and add `--translate` if you want English subtitles instead of subtitles in the original language. Translation needs the multilingual model, so install with `./install.sh --translate` or let the first run download it.
 
 | Language | Code | Translate to English | Subtitles in that language |
 |---|---|---|---|
 | Chinese | `zh` | `./run.sh --translate --language zh --model small` | `./run.sh --language zh --model small` |
-| Spanish | `es` | `./run.sh --translate --language es --model small` | `./run.sh --language es --model small` |
-| French | `fr` | `./run.sh --translate --language fr --model small` | `./run.sh --language fr --model small` |
+| Spanish | `es` | `./run.sh --translate --language es --model medium` | `./run.sh --language es --model small` |
+| French | `fr` | `./run.sh --translate --language fr --model medium` | `./run.sh --language fr --model small` |
 | Japanese | `ja` | `./run.sh --translate --language ja --model small` | `./run.sh --language ja --model small` |
 | Korean | `ko` | `./run.sh --translate --language ko --model small` | `./run.sh --language ko --model small` |
-| German | `de` | `./run.sh --translate --language de --model small` | `./run.sh --language de --model small` |
+| German | `de` | `./run.sh --translate --language de --model medium` | `./run.sh --language de --model small` |
 | Unknown or mixed | `auto` | `./run.sh --translate --model small` | `./run.sh --language auto --model small` |
 
-Other codes follow the same pattern, for example `ru`, `pt`, `it`, `ar`, `hi`, `vi`, `th` or `id`. Setting the language explicitly is about twice as fast as `auto`. For better accuracy use `--model medium`, which is slower.
+Other codes follow the same pattern, for example `ru`, `pt`, `it`, `ar`, `hi`, `vi`, `th` or `id`. Setting the language explicitly is about twice as fast as `auto`. For better accuracy use `--model medium`, which is slower. European languages translate noticeably better with `medium` than with `small`.
+
+How to download the models, the full list of language codes, and tested results: see **[Other languages: models and codes](#other-languages-models-and-codes)** below.
 
 ### Keyboard shortcuts
 
@@ -169,6 +172,75 @@ Drag the bar to move it. It also follows your mouse to another display.
 | `--partial-interval` | `0.6` | seconds between live preview updates (0 = off) |
 | `--max-chunk` | `4.0` | longest chunk before a forced cut |
 | `--device` | `BlackHole` | capture device name or index |
+
+---
+
+## Other languages: models and codes
+
+Whisper understands about 99 languages. You can use them in two ways:
+
+- **Translate to English subtitles**: `--translate --language <code>`
+- **Subtitles in the spoken language** (Chinese subtitles for Chinese speech, and so on): `--language <code>`, without `--translate`
+
+Whisper can only translate *into English*. Subtitles in other target languages (for example English → Chinese) are not supported.
+
+### Step 1: Get a multilingual model (one time)
+
+The default `base.en` model is English-only. Other languages need a multilingual model:
+
+```bash
+./install.sh --translate                  # downloads "small" (~480 MB): good for Chinese, Japanese, Korean
+./install.sh --model medium               # downloads "medium" (~1.5 GB): better translation, slower
+./install.sh --china --model medium       # same, through the mainland-China mirrors
+```
+
+Already installed? Running `install.sh` again is safe. It keeps your `.venv` and only downloads what's missing. Add `--no-blackhole` to skip the driver step.
+
+<details>
+<summary>Download a model by hand instead</summary>
+
+```bash
+.venv/bin/python -c "from faster_whisper import WhisperModel; WhisperModel('medium', device='cpu', compute_type='int8')"
+# mainland China: put  HF_ENDPOINT=https://hf-mirror.com  in front
+```
+Model folders are also on Hugging Face (`Systran/faster-whisper-small`, `Systran/faster-whisper-medium`, `Systran/faster-whisper-large-v3`). Download one into a folder and run with `--model /path/to/folder`.
+</details>
+
+| Model | Download | Speed per line (M-series) | Use for |
+|---|---|---|---|
+| `small` | ~480 MB | ~1 s | Chinese, Japanese, Korean → English; subtitles in the spoken language |
+| `medium` | ~1.5 GB | ~2–3 s | better translation, especially European languages (Spanish, French, German ...) |
+| `large-v3` | ~3 GB | too slow for live use on most Macs | best quality, for recorded videos / transcripts |
+
+### Step 2: Run with the language code
+
+Use the commands in the [Other spoken languages](#other-spoken-languages) table above, with any code from this list:
+
+| Language | Code | | Language | Code | | Language | Code |
+|---|---|---|---|---|---|---|---|
+| Chinese (Mandarin) | `zh` | | French | `fr` | | Arabic | `ar` |
+| Japanese | `ja` | | German | `de` | | Hindi | `hi` |
+| Korean | `ko` | | Spanish | `es` | | Turkish | `tr` |
+| Vietnamese | `vi` | | Portuguese | `pt` | | Russian | `ru` |
+| Thai | `th` | | Italian | `it` | | Persian | `fa` |
+| Indonesian | `id` | | Dutch | `nl` | | Amharic | `am` |
+
+The full list of codes is in [Whisper's tokenizer](https://github.com/openai/whisper/blob/main/whisper/tokenizer.py) (`LANGUAGES`).
+
+**Tips**
+
+- **Always give `--language`** when you know it. Auto-detect costs about 1 s per line and can guess wrong on short clips.
+- Quality depends on the language. Widely spoken languages work best; low-resource languages (for example Amharic) may be poor even with `medium`.
+- If a translation comes out in the original language or garbled, use a bigger model (`--model medium`).
+- Chinese, Japanese and Korean characters display correctly in the overlay; macOS picks a suitable font automatically.
+
+Tested on a MacBook (Apple Silicon) with `small` and `--cpu-threads 8`:
+
+| Spoken | Subtitles in the spoken language | Translated to English |
+|---|---|---|
+| Chinese | 今天我们来做一个非常好吃的汉堡,首先把牛肉切碎… (1.1 s) | "Today we are going to make a very delicious burger. First chop the beef…" (1.0 s) |
+| Japanese | 今日は、とても美味しいハンバーガーを作ります (0.9 s) | "Today, I will make a very delicious hamburger." (0.9 s) |
+| Spanish | "Hoy vamos a preparar una hamburguesa muy deliciosa." (0.9 s) | weak with `small`: use `--model medium` |
 
 ---
 
