@@ -30,7 +30,7 @@ Si no tienes git, en GitHub pulsa **Code → Download ZIP**, descomprime el arch
 
 ```bash
 ./install.sh                 # instalación normal
-./install.sh --translate     # además, el modelo multilingüe para traducir al inglés
+./install.sh --model medium  # además, el modelo multilingüe "medium" (~1,5 GB) para traducir español → inglés
 ```
 
 El instalador:
@@ -76,7 +76,7 @@ Después, cierra y vuelve a abrir Terminal.
 | Quiero… | Comando |
 |---|---|
 | Subtítulos en inglés | `./run.sh` |
-| **Vídeo en español → subtítulos en inglés** | `./run.sh --translate --language es --model small` |
+| **Vídeo en español → subtítulos en inglés** | `./run.sh --translate --language es --model medium` |
 | Cualquier idioma → inglés (detección automática) | `./run.sh --translate --model small` |
 | Subtítulos en español (sin traducir) | `./run.sh --language es --model small` |
 | Ver todas las opciones | `./run.sh --help` |
