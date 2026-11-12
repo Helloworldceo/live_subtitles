@@ -1021,9 +1021,14 @@ def main(argv: list[str] | None = None) -> int:
     # Clean shutdown, whichever way we quit.
     def shutdown() -> None:
         print("\nShutting down ...")
+        # Watchdog: if anything below hangs (audio driver, a long transcription),
+        # force the process to exit after 3 seconds so quitting always works.
+        watchdog = threading.Timer(3.0, lambda: os._exit(0))
+        watchdog.daemon = True
+        watchdog.start()
         worker.stop()
         audio.stop()
-        worker.join(timeout=5)
+        worker.join(timeout=2)
         if hotkeys:
             hotkeys.close()
         outputs.close()
@@ -1045,7 +1050,12 @@ def main(argv: list[str] | None = None) -> int:
     audio.start()
     worker.start()
     print("Running. Play some audio. Quit with Ctrl+Option+Q, Esc on the overlay, or Ctrl+C here.")
-    return app.exec()
+    code = app.exec()
+    sys.stdout.flush()
+    sys.stderr.flush()
+    # Exit right away: background threads of the speech engine or audio driver must
+    # not keep the process (and the overlay) alive after quitting.
+    os._exit(code)
 
 
 if __name__ == "__main__":
