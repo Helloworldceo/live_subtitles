@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+models/
+transcript_*.txt
+obs_subtitles.txt
+run.log
+*.bak*
+.DS_Store

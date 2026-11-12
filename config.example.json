@@ -1,0 +1,12 @@
+{
+  "device": "BlackHole",
+  "model": "base",
+  "font_size": 30,
+  "text_color": "#FFD700",
+  "bg_color": "#000000",
+  "bg_opacity": 0.45,
+  "max_lines": 2,
+  "clear_after": 5,
+  "min_chunk": 1.0,
+  "max_chunk": 4.0
+}
