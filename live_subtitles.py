@@ -105,6 +105,11 @@ HALLUCINATIONS = {
     "bye.",
     "so",
     "okay.",
+    "i'm sorry",
+    "i'm sorry. i'm sorry",
+    "sorry",
+    "oh",
+    "hmm",
     "...",
 }
 
@@ -755,6 +760,11 @@ class Overlay(QWidget):
 
     def _reflow(self) -> None:
         """Resize to fit the text, keeping the bottom edge where it was."""
+        if not self.label.text():
+            # Nothing to show: shrink to a 1-pixel strip so no empty box can linger.
+            self.resize(self.width(), 1)
+            self.move(int(self._center_x - self.width() / 2), int(self._anchor_bottom - 1))
+            return
         self.adjustSize()
         h = max(self.sizeHint().height(), 10)
         self.resize(self.width(), h)
@@ -762,9 +772,15 @@ class Overlay(QWidget):
 
     # -- painting --------------------------------------------------------
     def paintEvent(self, _event) -> None:
+        p = QPainter(self)
+        # Always wipe the window first. On macOS a translucent window keeps its old
+        # pixels if we paint nothing, which left the dark box on screen after the
+        # text was gone.
+        p.setCompositionMode(QPainter.CompositionMode_Clear)
+        p.fillRect(self.rect(), Qt.transparent)
+        p.setCompositionMode(QPainter.CompositionMode_SourceOver)
         if not self.label.text():
             return  # nothing to show: stay fully invisible (no empty box)
-        p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
         p.setPen(Qt.NoPen)
         p.setBrush(self.bg)
@@ -817,6 +833,10 @@ def apply_macos_window_tweaks(widget: QWidget) -> None:
         # stealing focus (NSWindowStyleMaskNonactivatingPanel = 1 << 7).
         window.setStyleMask_(window.styleMask() | (1 << 7))
         window.setHidesOnDeactivate_(False)
+        # No system shadow: macOS draws it around the window's last content, which can
+        # leave a ghost of the box behind when the subtitle is empty.
+        window.setHasShadow_(False)
+        window.setOpaque_(False)
         macos_raise(widget)
     except Exception as exc:
         print(f"(macOS window tweaks skipped: {exc})")
